@@ -65,8 +65,8 @@ For getting started with node-serialport, we recommend you begin with the follow
         * [`Event: "disconnect"`](#module_serialport--SerialPort+event_disconnect)
         * [`Event: "close"`](#module_serialport--SerialPort+event_close)
     * _static_
-        * [`.parsers`](#module_serialport--SerialPort.parsers) : <code>object</code>
         * [`.list`](#module_serialport--SerialPort.list) : <code>function</code>
+        * [`.parsers`](#module_serialport--SerialPort.parsers) : <code>object</code>
     * _inner_
         * [`~errorCallback`](#module_serialport--SerialPort..errorCallback) : <code>function</code>
         * [`~openOptions`](#module_serialport--SerialPort..openOptions) : <code>Object</code>
@@ -504,64 +504,6 @@ The `close` event's callback is called with no arguments when the port is closed
 
 -
 
-<a name="module_serialport--SerialPort.parsers"></a>
-
-#### `SerialPort.parsers` : <code>object</code>
-Parsers will process incoming data in a variety of ways and are meant to be passed to a port during construction.
-
-**Kind**: static property of <code>[SerialPort](#exp_module_serialport--SerialPort)</code>  
-**Properties**
-
-| Name | Type | Description |
-| --- | --- | --- |
-| raw | <code>function</code> | emits a raw buffer as a data event as it's received. This is the default parser. |
-| readline | <code>function</code> | returns a function that emits a string as a data event after a newline delimiter is received. |
-| byteLength | <code>function</code> | returns a function that emits a data event as a buffer after a specific number of bytes are received. |
-| byteDelimiter | <code>function</code> | returns a function that emits a data event each time a byte sequence (an array of bytes) is received. |
-
-**Example**  
-To use the readline parser, you must provide a delimiter as such:
-
-```js
-var SerialPort = require('serialport');
-
-var port = new SerialPort('/dev/tty-usbserial1', {
-  parser: SerialPort.parsers.readline('\n')
-});
-```
-
-To use the raw parser don't specify any parser, however if you really want to you can:
-
-```js
-var SerialPort = require('serialport');
-
-var port = new SerialPort('/dev/tty-usbserial1', {
-  parser: SerialPort.parsers.raw
-});
-```
-
-Note that the raw parser does not guarantee that all data it receives will come in a single event.
-
-To use the byte sequence parser, you must provide a delimiter as an array of bytes:
-```js
-var SerialPort = require('serialport');
-
-var port = new SerialPort('/dev/tty-usbserial1', {
-  parser: SerialPort.parsers.byteDelimiter([10,13])
-});
-```
-
-To use the byte length parser, you must provide a delimiter as a length in bytes:
-```js
-var SerialPort = require('serialport');
-
-var port = new SerialPort('/dev/tty-usbserial1', {
-  parser: SerialPort.parsers.byteLength(5)
-});
-```
-
--
-
 <a name="module_serialport--SerialPort.list"></a>
 
 #### `SerialPort.list` : <code>function</code>
@@ -601,6 +543,66 @@ SerialPort.list(function (err, ports) {
 
 -
 
+<a name="module_serialport--SerialPort.parsers"></a>
+
+#### `SerialPort.parsers` : <code>object</code>
+Parsers are [Transform streams](https://nodejs.org/api/stream.html#stream_class_stream_transform) that will parse data in a variety of ways and can be used to process incoming data.
+
+**Kind**: static property of <code>[SerialPort](#exp_module_serialport--SerialPort)</code>  
+**Properties**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| ByteLength | <code>function</code> | is a transform stream that emits data each time a byte sequence is received. |
+| Delimiter | <code>function</code> | is a transform stream that emits data as a buffer after a specific number of bytes are received. |
+| ReadLine | <code>function</code> | is a transform stream that emits data after a newline delimiter is received. |
+
+**Example**  
+To use any of the parsers you need to create them and then pipe the serialport to the parser. Be sure not to write to the parser but to the SerialPort object.
+```js
+var SerialPort = require('serialport');
+var ReadLine = SerialPort.parsers.ReadLine;
+var port = new SerialPort('/dev/tty-usbserial1');
+var parser = new ReadLine();
+port.pipe(parser);
+parser.on('data', console.log);
+port.write('ROBOT PLEASE RESPOND\n');
+
+// creating the parser and piping can be shortened to
+var parser = port.pipe(new ReadLine());
+```
+
+To use the byte length parser, you must provide the length of the number of bytes:
+```js
+var SerialPort = require('serialport');
+var port = new SerialPort('/dev/tty-usbserial1');
+var ByteLength = SerialPort.parsers.ByteLength
+var parser = port.pipe(new ByteLength({length: 8}));
+port.pipe(parser);
+parser.on('data', console.log);
+```
+
+To use the Delimiter parser you must specify, you must provide a delimiter as a string, buffer, or an array of bytes:
+```js
+var SerialPort = require('serialport');
+var port = new SerialPort('/dev/tty-usbserial1');
+var Delimiter = SerialPort.parsers.Delimiter;
+var parser = new Delimiter({delimiter: new Buffer('EOL')});
+port.pipe(parser);
+parser.on('data', console.log);
+```
+
+To use the ReadLine parser, you may provide a delimiter (defaults to '\n')
+```js
+var SerialPort = require('serialport');
+var SerialPort = require('serialport');
+var ReadLine = SerialPort.parsers.ReadLine;
+var parser = port.pipe(ReadLine({delimiter: '\r\n'}));
+parser.on('data', console.log);
+```
+
+-
+
 <a name="module_serialport--SerialPort..errorCallback"></a>
 
 #### `SerialPort~errorCallback` : <code>function</code>
@@ -634,7 +636,6 @@ A callback called with an error or null.
 | xoff | <code>boolean</code> | <code>false</code> | flow control setting |
 | xany | <code>boolean</code> | <code>false</code> | flow control setting |
 | bufferSize | <code>number</code> | <code>65536</code> | Size of read buffer |
-| parser | <code>function</code> | <code>Parsers.raw</code> | The parser to transform read data, defaults to the `raw` parser that emits data as it's received. |
 | platformOptions | <code>object</code> |  | sets platform specific options |
 | platformOptions.vmin | <code>number</code> | <code>1</code> | see [`man termios`](http://linux.die.net/man/3/termios) |
 | platformOptions.vtime | <code>number</code> | <code>0</code> | see [`man termios`](http://linux.die.net/man/3/termios) |
